@@ -1,0 +1,189 @@
+import 'package:flutter/material.dart';
+import 'package:core/features/finance/finance_setup_page.dart';
+import 'package:core/features/money/money_controller.dart';
+import 'package:core/features/money/money_widgets.dart';
+
+class MoneyPage extends StatefulWidget {
+  const MoneyPage({super.key, this.isActive = false});
+
+  final bool isActive;
+
+  @override
+  State<MoneyPage> createState() => _MoneyPageState();
+}
+
+class _MoneyPageState extends State<MoneyPage> {
+  late final MoneyController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MoneyController()..addListener(_onControllerChanged);
+    if (widget.isActive) {
+      _controller.load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(MoneyPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _controller.load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _openTransactionForm({required bool isSpend}) async {
+    if (isSpend) {
+      if (_controller.banks.isEmpty && _controller.creditCards.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Add a bank or credit card first in Finance Setup'),
+          ),
+        );
+        return;
+      }
+    } else if (_controller.banks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add a bank account first in Finance Setup'),
+        ),
+      );
+      return;
+    }
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => TransactionFormSheet(
+        isSpend: isSpend,
+        banks: _controller.banks,
+        controller: _controller,
+      ),
+    );
+
+    if (saved != true || !mounted) {
+      return;
+    }
+  }
+
+  void _openFinanceSetup() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const FinanceSetupPage()))
+        .then((_) => _controller.load(showFullPageLoader: false));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_controller.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_controller.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_controller.error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _controller.load,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final activity = groupMoneyActivity(_controller.transactions);
+
+    return RefreshIndicator(
+      onRefresh: () => _controller.load(showFullPageLoader: false),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                BalanceHero(
+                  banks: _controller.banks,
+                  creditCards: _controller.creditCards,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MoneyActionButton(
+                        label: 'Spend',
+                        icon: Icons.arrow_upward_rounded,
+                        color: const Color(0xFFC62828),
+                        onTap: () => _openTransactionForm(isSpend: true),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: MoneyActionButton(
+                        label: 'Gain',
+                        icon: Icons.arrow_downward_rounded,
+                        color: const Color(0xFF2E7D32),
+                        onTap: () => _openTransactionForm(isSpend: false),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_controller.banks.isEmpty) ...[
+                  const SizedBox(height: 16),
+                  EmptySetupCard(onSetup: _openFinanceSetup),
+                ],
+                const SizedBox(height: 28),
+                Text(
+                  'Recent activity',
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 10),
+                if (_controller.transactions.isEmpty) const EmptyActivity(),
+              ]),
+            ),
+          ),
+          if (activity.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+              sliver: SliverList.builder(
+                itemCount: activity.length,
+                itemBuilder: (context, index) {
+                  final entry = activity[index];
+                  if (entry.isHeader) {
+                    return TransactionDateHeader(label: entry.label!);
+                  }
+                  final transaction = entry.transaction!;
+                  return TransactionTile(
+                    transaction: transaction,
+                    onTap: () => showTransactionDetails(context, transaction),
+                  );
+                },
+              ),
+            )
+          else
+            const SliverPadding(padding: EdgeInsets.only(bottom: 28)),
+        ],
+      ),
+    );
+  }
+}
