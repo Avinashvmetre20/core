@@ -3,6 +3,30 @@ import 'package:core/core/api/api_client.dart';
 typedef FinanceException = ApiException;
 
 class FinanceApi {
+  static const cashBankName = 'Cash';
+  static const cashAccountType = 'saving';
+
+  static bool isCashAccount(Map<String, dynamic> bank) {
+    return '${bank['bankName'] ?? ''}'.trim().toLowerCase() == cashBankName.toLowerCase();
+  }
+
+  static Map<String, dynamic> _cashPayload(num? balance) {
+    return {
+      'bankName': cashBankName,
+      'accountType': cashAccountType,
+      'accountLast4': null,
+      'balance': balance,
+    };
+  }
+
+  static Future<Map<String, dynamic>> createCash({num? balance}) {
+    return createBank(_cashPayload(balance));
+  }
+
+  static Future<Map<String, dynamic>> updateCash(int bankId, {num? balance}) {
+    return updateBank(bankId, _cashPayload(balance));
+  }
+
   static Future<List<Map<String, dynamic>>> listBanks() async {
     final data = await ApiClient.get('/banks');
     if (data.statusCode != 200) {

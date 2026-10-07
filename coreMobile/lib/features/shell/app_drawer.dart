@@ -32,7 +32,7 @@ class _AppDrawerState extends State<AppDrawer> {
 
     return Drawer(
       width: MediaQuery.sizeOf(context).width * 0.84,
-      backgroundColor: const Color(0xFFFCFAFB),
+      backgroundColor: shellCanvas,
       child: SafeArea(
         child: Column(
           children: [
@@ -199,7 +199,7 @@ class _DrawerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = danger
-        ? shellAccent
+        ? shellDanger
         : selected
         ? shellAccent
         : const Color(0xFF2C2C2E);
@@ -223,7 +223,7 @@ class _DrawerRow extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: selected || plainIcon
                         ? Colors.transparent
-                        : const Color(0xFFF2F1F3),
+                        : const Color(0xFFE7F6FD),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, size: 22, color: color),

@@ -54,7 +54,7 @@ class ApiClient {
     if (override.isNotEmpty) {
       return override;
     }
-    return 'https://core-backend-ho5o.onrender.com';
+    return 'https://core-7g3t.onrender.com';
   }
 
   static ApiClient? _instance;

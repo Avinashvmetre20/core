@@ -93,11 +93,30 @@ class _FinanceSetupPageState extends State<FinanceSetupPage> {
     }
   }
 
+  List<Map<String, dynamic>> get _bankAccounts {
+    return _banks.where((bank) => !FinanceApi.isCashAccount(bank)).toList();
+  }
+
+  List<Map<String, dynamic>> get _cashAccounts {
+    return _banks.where(FinanceApi.isCashAccount).toList();
+  }
+
+  Future<void> _openCashForm({Map<String, dynamic>? cash}) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _CashFormSheet(cash: cash),
+    );
+    if (saved == true) {
+      await _load();
+    }
+  }
+
   Future<void> _openCardForm({Map<String, dynamic>? card}) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _CardFormSheet(card: card, banks: _banks),
+      builder: (_) => _CardFormSheet(card: card, banks: _bankAccounts),
     );
     if (saved == true) {
       await _load();
@@ -115,6 +134,42 @@ class _FinanceSetupPageState extends State<FinanceSetupPage> {
       builder: (context) => AlertDialog(
         title: const Text('Delete bank'),
         content: Text('Delete ${bank['bankName'] ?? 'this bank'}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await FinanceApi.deleteBank(bankId);
+      await _load();
+    } on FinanceException catch (error) {
+      _showMessage(error.message);
+    }
+  }
+
+  Future<void> _deleteCash(Map<String, dynamic> cash) async {
+    final bankId = cash['bankId'];
+    if (bankId is! int) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete cash'),
+        content: const Text('Delete this cash account?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -202,10 +257,10 @@ class _FinanceSetupPageState extends State<FinanceSetupPage> {
                         title: 'Banks',
                         onAdd: () => _openBankForm(),
                       ),
-                      if (_banks.isEmpty)
+                      if (_bankAccounts.isEmpty)
                         const _EmptyBox(text: 'No bank accounts yet')
                       else
-                        ..._banks.map(
+                        ..._bankAccounts.map(
                           (bank) => _FinanceTile(
                             title: '${bank['bankName'] ?? ''}',
                             subtitle: [
@@ -218,6 +273,25 @@ class _FinanceSetupPageState extends State<FinanceSetupPage> {
                             ].where((part) => part.isNotEmpty).join('  ·  '),
                             onEdit: () => _openBankForm(bank: bank),
                             onDelete: () => _deleteBank(bank),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      _SectionHeader(
+                        title: 'Cash',
+                        onAdd: () => _openCashForm(),
+                      ),
+                      if (_cashAccounts.isEmpty)
+                        const _EmptyBox(text: 'No cash account yet')
+                      else
+                        ..._cashAccounts.map(
+                          (cash) => _FinanceTile(
+                            title: FinanceApi.cashBankName,
+                            subtitle: [
+                              FinanceApi.cashAccountType,
+                              if (cash['balance'] != null) 'Bal: ${cash['balance']}',
+                            ].join('  ·  '),
+                            onEdit: () => _openCashForm(cash: cash),
+                            onDelete: () => _deleteCash(cash),
                           ),
                         ),
                       const SizedBox(height: 24),
@@ -563,7 +637,10 @@ class _CardFormSheetState extends State<_CardFormSheet> {
       text: _cardType == 'Other' ? existingType : '',
     );
     _last4 = TextEditingController(text: '${card?['cardLast4'] ?? ''}');
-    _bankId = card?['bankId'] is int ? card!['bankId'] as int : null;
+    final bankId = card?['bankId'];
+    _bankId = bankId is int && widget.banks.any((bank) => bank['bankId'] == bankId)
+        ? bankId
+        : null;
   }
 
   @override
@@ -728,6 +805,129 @@ class _CardFormSheetState extends State<_CardFormSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CashFormSheet extends StatefulWidget {
+  const _CashFormSheet({this.cash});
+
+  final Map<String, dynamic>? cash;
+
+  @override
+  State<_CashFormSheet> createState() => _CashFormSheetState();
+}
+
+class _CashFormSheetState extends State<_CashFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _balance;
+  bool _saving = false;
+
+  bool get _isEdit => widget.cash != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final cash = widget.cash;
+    _balance = TextEditingController(
+      text: cash?['balance'] == null ? '' : '${cash?['balance']}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _balance.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _saving = true);
+    final balance = _balance.text.trim().isEmpty ? null : num.tryParse(_balance.text.trim());
+
+    try {
+      if (_isEdit) {
+        await FinanceApi.updateCash(widget.cash!['bankId'] as int, balance: balance);
+      } else {
+        await FinanceApi.createCash(balance: balance);
+      }
+      if (!mounted) {
+        return;
+      }
+      Navigator.pop(context, true);
+    } on FinanceException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+      setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottom),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _isEdit ? 'Edit cash' : 'Add cash',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            const InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(),
+              ),
+              child: Text(FinanceApi.cashBankName),
+            ),
+            const SizedBox(height: 12),
+            const InputDecorator(
+              decoration: InputDecoration(
+                labelText: 'Account type',
+                border: OutlineInputBorder(),
+              ),
+              child: Text(FinanceApi.cashAccountType),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _balance,
+              decoration: const InputDecoration(
+                labelText: 'Balance',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              validator: (value) {
+                final text = value?.trim() ?? '';
+                if (text.isEmpty) {
+                  return null;
+                }
+                if (num.tryParse(text) == null) {
+                  return 'Enter a valid balance';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? 'Saving...' : 'Save'),
+            ),
+          ],
         ),
       ),
     );

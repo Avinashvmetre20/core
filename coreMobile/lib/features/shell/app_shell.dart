@@ -114,14 +114,9 @@ class _AppShellState extends State<AppShell> {
             const ProfilePage(),
           ],
         ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: AppBottomNav(
-              selectedIndex: _index,
-              onSelected: (value) => setState(() => _index = value),
-            ),
-          ),
+        bottomNavigationBar: AppBottomNav(
+          selectedIndex: _index,
+          onSelected: (value) => setState(() => _index = value),
         ),
       ),
     );

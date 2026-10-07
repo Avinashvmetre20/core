@@ -10,6 +10,7 @@ import 'package:core/core/security/secure_store.dart';
 import 'package:core/features/auth/login_page.dart';
 import 'package:core/features/auth/mpin_setup_page.dart';
 import 'package:core/features/auth/mpin_unlock_page.dart';
+import 'package:core/features/shell/app_bottom_nav.dart';
 import 'package:core/features/shell/app_shell.dart';
 
 class CoreApp extends StatelessWidget {
@@ -25,7 +26,8 @@ class CoreApp extends StatelessWidget {
         navigatorKey: auth.navigatorKey,
         title: 'Core',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD32F2F)),
+          colorScheme: ColorScheme.fromSeed(seedColor: shellAccent),
+          scaffoldBackgroundColor: shellCanvas,
           useMaterial3: true,
         ),
         home: const AuthGate(),

@@ -20,25 +20,29 @@ const appTabs = <AppTab>[
   ),
   AppTab(
     label: 'Vault',
-    icon: Icons.lock_outline,
+    icon: Icons.lock_outline_rounded,
     selectedIcon: Icons.lock_rounded,
   ),
   AppTab(
     label: 'Money',
     icon: Icons.account_balance_wallet_outlined,
-    selectedIcon: Icons.account_balance_wallet,
+    selectedIcon: Icons.account_balance_wallet_rounded,
   ),
   AppTab(
     label: 'Profile',
-    icon: Icons.person_outline,
-    selectedIcon: Icons.person,
+    icon: Icons.person_outline_rounded,
+    selectedIcon: Icons.person_rounded,
   ),
 ];
 
-const shellCanvas = Color(0xFFF7F5F6);
-const shellAccent = Color(0xFFC44747);
-const shellAccentSoft = Color(0xFFF6D6D6);
-const shellMuted = Color(0xFF8E8E93);
+const shellCanvas = Color(0xFFF5F9FC);
+const shellAccent = Color(0xFF2E9BFD);
+const shellAccentSoft = Color(0xFFDDF1FF);
+const shellMuted = Color(0xFF71808F);
+const shellDanger = Color(0xFFC44747);
+
+const _navSurface = Color(0xFFFFFFFF);
+const _navIcon = Color(0xFF52606D);
 
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
@@ -52,57 +56,65 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8F8),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1C1C1E).withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+    final selected = selectedIndex.clamp(0, appTabs.length - 1);
+
+    return SafeArea(
+      top: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final slot = constraints.maxWidth / appTabs.length;
-            return Stack(
-              children: [
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 320),
-                  curve: Curves.easeOutCubic,
-                  left: slot * selectedIndex,
-                  width: slot,
-                  top: 0,
-                  bottom: 0,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 2),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: shellAccentSoft,
-                        borderRadius: BorderRadius.all(Radius.circular(18)),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Container(
+          height: 72,
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(
+            color: _navSurface,
+            borderRadius: BorderRadius.all(Radius.circular(26)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x1417212B),
+                blurRadius: 16,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final slot = constraints.maxWidth / appTabs.length;
+              return Stack(
+                children: [
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    left: slot * selected,
+                    width: slot,
+                    top: 0,
+                    bottom: 0,
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: shellAccentSoft,
+                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Row(
-                  children: [
-                    for (var i = 0; i < appTabs.length; i++)
-                      Expanded(
-                        child: _NavItem(
-                          tab: appTabs[i],
-                          selected: i == selectedIndex,
-                          onTap: () => onSelected(i),
+                  Row(
+                    children: [
+                      for (var i = 0; i < appTabs.length; i++)
+                        Expanded(
+                          child: _NavItem(
+                            tab: appTabs[i],
+                            selected: i == selected,
+                            onTap: () => onSelected(i),
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
-            );
-          },
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -122,55 +134,42 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(end: selected ? 1 : 0),
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-          builder: (context, t, _) {
-            final color = Color.lerp(shellMuted, shellAccent, t)!;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: Transform.scale(
-                      key: ValueKey(selected),
-                      scale: 0.92 + (0.08 * t),
-                      child: Icon(
-                        selected ? tab.selectedIcon : tab.icon,
-                        size: 22,
-                        color: color,
-                      ),
-                    ),
+    final color = selected ? shellAccent : _navIcon;
+    final labelColor = selected ? shellAccent : shellMuted;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: tab.label,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: ExcludeSemantics(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  selected ? tab.selectedIcon : tab.icon,
+                  size: 22,
+                  color: color,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  tab.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                    height: 1.1,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    tab.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.lerp(
-                        FontWeight.w500,
-                        FontWeight.w600,
-                        t,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
